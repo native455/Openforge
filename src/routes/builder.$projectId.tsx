@@ -12,7 +12,7 @@ import { parseAiResponse } from "@/lib/forge/schema";
 import { requestChanges } from "@/lib/forge/ai";
 import { isConfigured, loadSettings, type ProviderSettings } from "@/lib/forge/settings";
 import { buildZip } from "@/lib/forge/zip";
-import { Download, History, Loader2, Send, Undo2, Square } from "lucide-react";
+import { Download, History, Loader2, Send, Undo2, Square, Sparkles, MonitorPlay, Code2, CircleDot } from "lucide-react";
 
 const Preview = lazy(() => import("@/components/forge/Preview"));
 
@@ -153,8 +153,9 @@ function Builder() {
         ))}
       </div>
       <div className="grid min-h-0 flex-1 md:grid-cols-[320px_1fr_minmax(320px,32%)]">
-        <section aria-label="Conversation" className={`${panel("chat")} border-r border-border bg-card/40`}>
-          <div className="flex-1 space-y-3 overflow-auto p-3">
+        <section aria-label="Conversation" className={`${panel("chat")} border-r border-border bg-white`}>
+          <div className="flex h-12 shrink-0 items-center justify-between border-b border-border/80 px-4"><div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> AI assistant</div><span className="text-[11px] text-muted-foreground">BUILD</span></div>
+          <div className="flex-1 space-y-3 overflow-auto bg-white p-3">
             {!configured && (
               <div className="rounded-lg border border-primary/40 bg-card p-3 text-sm">
                 <p className="font-medium">Demo mode</p>
@@ -184,13 +185,15 @@ function Builder() {
           </form>
         </section>
         <section aria-label="Live preview" className={`${panel("preview")} bg-background`}>
+          <div className="flex h-12 shrink-0 items-center justify-between border-b border-border/80 bg-white px-4"><div className="flex items-center gap-2 text-sm font-semibold"><MonitorPlay className="h-4 w-4 text-primary" /> Preview</div><span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700"><CircleDot className="h-3 w-3" /> LIVE</span></div>
           <ClientOnly fallback={<div className="flex flex-1 items-center justify-center text-muted-foreground">Loading preview…</div>}>
             <Suspense fallback={<div className="flex flex-1 items-center justify-center text-muted-foreground">Loading preview…</div>}>
               <div className="min-h-[60vh] flex-1 md:min-h-0"><Preview files={project.files} /></div>
             </Suspense>
           </ClientOnly>
         </section>
-        <section aria-label="Code" className={`${panel("code")} border-l border-border`}>
+        <section aria-label="Code" className={`${panel("code")} border-l border-border bg-white`}>
+          <div className="flex h-12 shrink-0 items-center justify-between border-b border-border/80 bg-white px-4"><div className="flex items-center gap-2 text-sm font-semibold"><Code2 className="h-4 w-4 text-primary" /> Code</div><span className="text-[11px] text-muted-foreground">{Object.keys(project.files).length} files</span></div>
           <FileExplorer files={project.files} onSave={saveFile} onDelete={deleteFile} />
         </section>
       </div>
