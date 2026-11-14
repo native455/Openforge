@@ -59,12 +59,24 @@ function Builder() {
     commit(p); setInput(""); setBusy(true);
     const ctrl = new AbortController(); abortRef.current = ctrl;
     try {
-      const history = project.messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role, content: m.proposal ? m.proposal.summary : m.content }));
+      const history = project.messages.filter((m) => m.role !== "system").map((m) => ({
+        role: m.role,
+        content: m.proposal ? `[Proposal ${m.proposal.status}] ${m.proposal.summary}` : m.content,
+      }));
       const raw = await requestChanges(settings, project.files, history, text, ctrl.signal);
       const parsed = parseAiResponse(raw);
-      const msg: ChatMessage = parsed.ok
-        ? { id: uid(), role: "assistant", content: parsed.summary, at: Date.now(), proposal: { id: uid(), summary: parsed.summary, changes: parsed.changes, rejected: parsed.rejected, status: "pending" } }
-        : { id: uid(), role: "system", content: parsed.error + " Try rephrasing, or use a stronger model.", at: Date.now() };
+      let msg: ChatMessage;
+      if (!parsed.ok) {
+        msg = { id: uid(), role: "system", content: parsed.error + " Try rephrasing, or use a stronger model.", at: Date.now() };
+      } else {
+        // Ignore no-op edits so the assistant cannot ask the user to apply code that is already present.
+        const effectiveChanges = parsed.changes.filter((change) =>
+          change.action === "delete" ? change.path in project.files : project.files[change.path] !== change.content
+        );
+        msg = effectiveChanges.length > 0
+          ? { id: uid(), role: "assistant", content: parsed.summary, at: Date.now(), proposal: { id: uid(), summary: parsed.summary, changes: effectiveChanges, rejected: parsed.rejected, status: "pending" } }
+          : { id: uid(), role: "assistant", content: parsed.summary, at: Date.now() };
+      }
       p = { ...p, messages: [...p.messages, msg] };
     } catch (e) {
       const aborted = (e as Error).name === "AbortError";
