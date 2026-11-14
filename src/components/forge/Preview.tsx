@@ -5,7 +5,7 @@ export default function Preview({ files }: { files: Files }) {
   return (
     <SandpackProvider
       template="react-ts"
-      theme="dark"
+      theme="light"
       files={files}
       options={{ externalResources: ["https://cdn.tailwindcss.com"], recompileMode: "delayed", recompileDelay: 400 }}
       style={{ height: "100%" }}
