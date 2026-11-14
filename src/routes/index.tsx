@@ -6,7 +6,7 @@ import { AppHeader, CostNotice } from "@/components/forge/AppHeader";
 import { deleteProject, loadProjects, uid, upsertProject, type Project } from "@/lib/forge/storage";
 import { starterFiles } from "@/lib/forge/template";
 import { isConfigured, loadSettings } from "@/lib/forge/settings";
-import { ArrowUp, Clock3, Code2, FolderOpen, Globe2, Layers3, Plus, Sparkles, Trash2, X, HardDrive, WandSparkles } from "lucide-react";
+import { ArrowUp, Clock3, Code2, FolderOpen, Globe2, Layers3, Sparkles, Trash2, X, HardDrive, WandSparkles } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
