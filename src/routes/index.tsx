@@ -18,7 +18,7 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 function nameFrom(prompt: string) {
-  const w = prompt.trim().split(/\\s+/).slice(0, 4).join(" ");
+  const w = prompt.trim().split(/\s+/).slice(0, 4).join(" ");
   return w ? w.charAt(0).toUpperCase() + w.slice(1) : "Untitled project";
 }
 const examples = [
