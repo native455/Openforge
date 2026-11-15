@@ -54,7 +54,7 @@ async function callModel(apiKey: string, model: string, messages: { role: string
         "HTTP-Referer": "https://openforge-dh0r.onrender.com",
         "X-Title": "OpenForge",
       },
-      body: JSON.stringify({ model: candidate, messages, temperature: 0.2, max_tokens: maxTokens }),
+      body: JSON.stringify({\n        model: candidate, messages, temperature: 0.2, max_tokens: maxTokens,\n        ...(candidate.startsWith("nvidia/nemotron-3.5-lightning") ? { chat_template_kwargs: { enable_thinking: false } } : {}),\n      }),
     });
     if (!response.ok) {
       const detail = (await response.text()).slice(0, 400);
