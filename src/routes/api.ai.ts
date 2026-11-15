@@ -18,7 +18,7 @@ function allowed(ip: string) {
 }
 
 async function callModel(apiKey: string, model: string, messages: { role: string; content: string }[], maxTokens: number) {
-  const candidates = [...new Set([model, "nvidia/nemotron-3.5-lightning:free"])];
+  const candidates = [...new Set([model, "cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "nvidia/nemotron-3.5-lightning:free"])];
   let lastError = "The model returned an empty response.";
   for (const candidate of candidates) {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -102,7 +102,7 @@ export const Route = createFileRoute("/api/ai")({
             ...history,
             { role: "assistant", content: "Implementation plan:\n" + plan },
             { role: "user", content: body.prompt },
-          ], 8000);
+          ], 16000);
           return Response.json({ text: implementation, model });
         } catch (error) {
           return Response.json({ error: error instanceof Error ? error.message : "AI request failed." }, { status: 502 });
