@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AppHeader, CostNotice } from "@/components/forge/AppHeader";
 import { deleteProject, loadProjects, uid, upsertProject, type Project } from "@/lib/forge/storage";
 import { starterFiles } from "@/lib/forge/template";
-import { isConfigured, loadSettings } from "@/lib/forge/settings";
+import { getAiStatus } from "@/lib/forge/ai";
 import { ArrowUp, Clock3, Code2, FolderOpen, Globe2, Layers3, Sparkles, Trash2, X, HardDrive, WandSparkles } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -18,8 +18,10 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 function nameFrom(prompt: string) {
-  const w = prompt.trim().split(/\s+/).slice(0, 4).join(" ");
-  return w ? w.charAt(0).toUpperCase() + w.slice(1) : "Untitled project";
+  const cleaned = prompt.trim().replace(/^(please\s+)?(create|build|make|design|develop|add)\s+/i, "").replace(/\b(a|an|the|website|web app|app|for|to|that)\b/gi, " ").replace(/\s+/g, " ").trim();
+  const words = cleaned.split(" ").filter(Boolean).slice(0, 3);
+  const w = words.join(" ");
+  return w ? w.charAt(0).toUpperCase() + w.slice(1) : "New website";
 }
 const examples = [
   { icon: Globe2, label: "Business website", prompt: "Create a modern website for a local business with services, testimonials, contact details and a WhatsApp button." },
@@ -31,17 +33,17 @@ function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [prompt, setPrompt] = useState("");
   const [ready, setReady] = useState(false);
-  const [configured, setConfigured] = useState(false);
+  const [aiReady, setAiReady] = useState<boolean | null>(null);
   const [onboard, setOnboard] = useState(false);
   useEffect(() => {
-    setProjects(loadProjects()); setConfigured(isConfigured(loadSettings()));
+    setProjects(loadProjects()); getAiStatus().then((s) => setAiReady(s.configured)).catch(() => setAiReady(false));
     setOnboard(localStorage.getItem("openforge.onboarded") !== "1"); setReady(true);
   }, []);
   function create() {
     const name = nameFrom(prompt);
     const p: Project = { id: uid(), name, prompt, files: starterFiles(name, prompt), messages: [], snapshots: [], createdAt: Date.now(), updatedAt: Date.now() };
     upsertProject(p);
-    nav({ to: "/builder/$projectId", params: { projectId: p.id }, search: { q: prompt && configured ? prompt : undefined } });
+    nav({ to: "/builder/$projectId", params: { projectId: p.id }, search: { q: prompt || undefined } });
   }
   return (
     <div className="min-h-screen bg-forge">
@@ -52,7 +54,7 @@ function Dashboard() {
           <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> Welcome to OpenForge</div>
           <ol className="mt-3 list-decimal space-y-1.5 pl-5 pr-5 text-sm leading-relaxed text-muted-foreground">
             <li>Describe what you want to build and start with a working React project.</li>
-            <li>Add your own AI provider key in <Link to="/settings" className="font-medium text-primary underline">AI settings</Link> to generate changes through chat.</li>
+            <li>OpenForge handles the AI connection for you. No personal API key is required.</li>
             <li>Review changes before applying them, then preview and export your project.</li>
             <li>Projects are currently saved in this browser only.</li>
           </ol>
@@ -78,7 +80,7 @@ function Dashboard() {
             <span className="inline-flex items-center gap-1.5"><Code2 className="h-3.5 w-3.5" /> Export your code</span>
             <span className="inline-flex items-center gap-1.5"><Globe2 className="h-3.5 w-3.5" /> Live preview</span>
           </div>
-          <div className="mx-auto mt-4 max-w-2xl text-left"><CostNotice />{ready && !configured && <p className="mt-2 text-xs text-muted-foreground">AI chat is not configured yet. <Link to="/settings" className="font-medium text-primary underline">Connect an AI provider</Link>; you can still create and edit starter projects.</p>}</div>
+          <div className="mx-auto mt-4 max-w-2xl text-left"><CostNotice />{ready && aiReady === false && <p className="mt-2 text-xs text-amber-800">The shared AI engine is not activated yet. You will not be asked to provide a key.</p>}</div>
         </section>
         <section className="mt-16" aria-labelledby="recent">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
