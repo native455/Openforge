@@ -6,7 +6,7 @@ import { AppHeader, CostNotice } from "@/components/forge/AppHeader";
 import { deleteProject, loadProjects, uid, upsertProject, type Project } from "@/lib/forge/storage";
 import { starterFiles } from "@/lib/forge/template";
 import { getAiStatus } from "@/lib/forge/ai";
-import { ArrowUp, Clock3, Code2, FolderOpen, Globe2, Layers3, Sparkles, Trash2, X, HardDrive, WandSparkles, Plus, Search, LayoutTemplate, ChevronRight, Monitor, Smartphone, Tablet, Zap } from "lucide-react";
+import { ArrowUp, Clock3, Code2, FolderOpen, Globe2, Layers3, Sparkles, Trash2, X, HardDrive, WandSparkles, Plus, Search, ChevronRight, Monitor, Zap } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
@@ -67,7 +67,7 @@ function Dashboard() {
             <h1 className="text-balance text-4xl font-semibold leading-[1.06] tracking-[-.055em] text-white sm:text-5xl md:text-[64px]">From idea to <span className="bg-gradient-to-r from-violet-300 via-fuchsia-300 to-blue-300 bg-clip-text text-transparent">website.</span><br className="hidden sm:block" /> All in one workspace.</h1>
             <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-slate-400 sm:text-base">Describe what you have in mind. OpenForge plans the experience, builds the interface and gives you a live preview you can refine.</p>
             <form className="mx-auto mt-9 max-w-[760px] rounded-2xl border border-white/[0.13] bg-[#0b0e15] p-3 text-left shadow-[0_18px_60px_-25px_rgba(0,0,0,.8)] transition focus-within:border-violet-400/50 focus-within:shadow-[0_0_0_4px_rgba(139,92,246,.08)] sm:p-4" onSubmit={(e) => { e.preventDefault(); create(); }}>
-              <Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe the website or app you want to create..." className="min-h-28 resize-y border-0 bg-transparent px-2 py-2 text-[15px] leading-relaxed text-white shadow-none placeholder:text-slate-600 focus-visible:ring-0" aria-label="Project description" onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) create(); }} />
+              <Textarea id="project-prompt" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe the website or app you want to create..." className="min-h-28 resize-y border-0 bg-transparent px-2 py-2 text-[15px] leading-relaxed text-white shadow-none placeholder:text-slate-600 focus-visible:ring-0" aria-label="Project description" onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) create(); }} />
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.08] pt-3">
                 <div className="flex items-center gap-2 pl-1 text-xs text-slate-500"><WandSparkles className="h-4 w-4 text-violet-300" /> AI-assisted build <span className="text-slate-700">·</span> No API key needed</div>
                 <Button type="submit" disabled={!prompt.trim()} className="h-10 gap-2 rounded-xl bg-violet-500 px-5 font-semibold text-white shadow-[0_8px_24px_-10px_rgba(139,92,246,.9)] hover:bg-violet-400"><span>Start building</span><ArrowUp className="h-4 w-4" /></Button>
