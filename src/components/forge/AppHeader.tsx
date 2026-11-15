@@ -16,7 +16,7 @@ export function AppHeader({ children }: { children?: React.ReactNode }) {
           <FolderKanban className="h-4 w-4" /><span className="hidden sm:inline">Projects</span>
         </Link>
         <Link to="/settings" className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring [&.active]:bg-accent [&.active]:font-medium [&.active]:text-accent-foreground">
-          <Settings2 className="h-4 w-4" /><span className="hidden sm:inline">AI settings</span>
+          <Settings2 className="h-4 w-4" /><span className="hidden sm:inline">AI engine</span>
         </Link>
         <Link to="/deploy" className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring [&.active]:bg-accent [&.active]:font-medium [&.active]:text-accent-foreground">
           <Rocket className="h-4 w-4" /><span className="hidden sm:inline">Deploy</span>
