@@ -217,7 +217,7 @@ function Builder() {
             </div>
           </div>
         </section>
-        <section aria-label="Code" className={`${panel("code")} border-l border-white/[0.08] bg-[#10131a] max-xl:hidden`}>
+        <section aria-label="Code" className={`${tab === "code" ? "flex" : "hidden"} xl:flex min-h-0 flex-col border-l border-white/[0.08] bg-[#10131a]`}>
           <div className="flex h-[58px] shrink-0 items-center justify-between border-b border-white/[0.08] px-4"><div className="flex items-center gap-2 text-[13px] font-semibold text-white"><Code2 className="h-4 w-4 text-violet-300"/> Files</div><span className="rounded-md bg-white/[0.05] px-2 py-1 text-[10px] text-slate-500">{Object.keys(project.files).length} files</span></div>
           <div className="min-h-0 flex-1 overflow-auto"><FileExplorer files={project.files} onSave={saveFile} onDelete={deleteFile} /></div>
           <div className="border-t border-white/[0.07] px-4 py-3 text-[10px] text-slate-600">Your source code · Editable</div>
