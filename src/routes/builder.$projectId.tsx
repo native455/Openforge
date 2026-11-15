@@ -166,7 +166,7 @@ function Builder() {
         <section aria-label="Conversation" className={`${panel("chat")} border-r border-border bg-white`}>
           <div className="flex h-12 shrink-0 items-center justify-between border-b border-border/80 px-4"><div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> AI assistant</div><span className="text-[11px] text-muted-foreground">BUILD</span></div>
           <div className="flex-1 space-y-3 overflow-auto bg-white p-3">
-            {!configured && (
+            {aiReady === false && (
               <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
                 <p className="font-medium">OpenForge AI is being connected</p>
                 <p className="mt-1 text-amber-900">You will not need to enter an API key. The shared AI engine must be activated by OpenForge first.</p>
