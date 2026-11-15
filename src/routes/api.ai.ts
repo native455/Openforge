@@ -43,24 +43,37 @@ function allowed(ip: string) {
 }
 
 async function callModel(apiKey: string, model: string, messages: { role: string; content: string }[], maxTokens: number) {
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-      "HTTP-Referer": "https://openforge-dh0r.onrender.com",
-      "X-Title": "OpenForge",
-    },
-    body: JSON.stringify({ model, messages, temperature: 0.2, max_tokens: maxTokens }),
-  });
-  if (!response.ok) {
-    const detail = (await response.text()).slice(0, 400);
-    throw new Error(`AI provider returned ${response.status}: ${detail}`);
+  const candidates = [...new Set([model, "nvidia/nemotron-3.5-lightning:free"])];
+  let lastError = "The model returned an empty response.";
+  for (const candidate of candidates) {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        "HTTP-Referer": "https://openforge-dh0r.onrender.com",
+        "X-Title": "OpenForge",
+      },
+      body: JSON.stringify({ model: candidate, messages, temperature: 0.2, max_tokens: maxTokens }),
+    });
+    if (!response.ok) {
+      const detail = (await response.text()).slice(0, 400);
+      lastError = `AI provider returned ${response.status}: ${detail}`;
+      if (response.status === 401 || response.status === 402) throw new Error(lastError);
+      continue;
+    }
+    const payload = await response.json();
+    const raw = payload?.choices?.[0]?.message?.content;
+    const content = typeof raw === "string"
+      ? raw
+      : Array.isArray(raw)
+        ? raw.map((part: any) => typeof part?.text === "string" ? part.text : "").join("\\n")
+        : "";
+    if (content.trim()) return content;
+    const finish = payload?.choices?.[0]?.finish_reason || "unknown";
+    lastError = `Model ${candidate} returned no text (finish reason: ${finish}).`;
   }
-  const payload = await response.json();
-  const content = payload?.choices?.[0]?.message?.content;
-  if (typeof content !== "string" || !content.trim()) throw new Error("The model returned an empty response.");
-  return content;
+  throw new Error(lastError);
 }
 
 export const Route = createFileRoute("/api/ai")({
