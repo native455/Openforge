@@ -138,72 +138,89 @@ function Builder() {
   const panel = (t: Tab) => `${tab === t ? "flex" : "hidden"} md:flex min-h-0 flex-col`;
 
   return (
-    <div className="flex h-dvh flex-col">
+    <div className="flex h-dvh flex-col overflow-hidden bg-[#0b0d12] text-slate-100">
       <AppHeader>
-        <span className="truncate text-sm text-muted-foreground">/ {project.name}</span>
+        <span className="truncate text-sm text-slate-400">/ {project.name}</span>
         <div className="ml-auto flex items-center gap-1">
-          <Button size="sm" variant="ghost" onClick={() => project.snapshots[0] && restore(project.snapshots[0].id)} disabled={!project.snapshots.length} aria-label="Undo last change"><Undo2 /><span className="hidden lg:inline">Undo</span></Button>
-          <Button size="sm" variant="ghost" onClick={() => setShowHistory((v) => !v)} aria-expanded={showHistory}><History /><span className="hidden lg:inline">History ({project.snapshots.length})</span></Button>
-          <Button size="sm" variant="secondary" onClick={exportZip}><Download /><span className="hidden lg:inline">Export ZIP</span></Button>
+          <span className="mr-2 hidden items-center gap-1.5 rounded-full border border-emerald-400/15 bg-emerald-400/[0.07] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-300 sm:inline-flex"><CircleDot className="h-3 w-3"/> Autosaved locally</span>
+          <Button size="sm" variant="ghost" onClick={() => project.snapshots[0] && restore(project.snapshots[0].id)} disabled={!project.snapshots.length} aria-label="Undo last change" className="text-slate-400 hover:bg-white/10 hover:text-white"><Undo2 /><span className="hidden lg:inline">Undo</span></Button>
+          <Button size="sm" variant="ghost" onClick={() => setShowHistory((v) => !v)} aria-expanded={showHistory} className="text-slate-400 hover:bg-white/10 hover:text-white"><History /><span className="hidden lg:inline">History</span></Button>
+          <Button size="sm" variant="secondary" onClick={exportZip} className="border border-white/10 bg-white/[0.08] text-slate-100 hover:bg-white/[0.13]"><Download /><span className="hidden lg:inline">Export</span></Button>
         </div>
       </AppHeader>
       {showHistory && (
-        <div className="max-h-60 overflow-auto border-b border-border bg-card px-4 py-2 text-sm">
-          {project.snapshots.length === 0 ? <p className="text-muted-foreground">No snapshots yet. One is saved before every change.</p> : (
+        <div className="max-h-60 overflow-auto border-b border-white/10 bg-[#11141c] px-4 py-3 text-sm text-slate-200">
+          {project.snapshots.length === 0 ? <p className="text-slate-500">No snapshots yet. One is saved before every change.</p> : (
             <ul className="space-y-1">{project.snapshots.map((s) => (
-              <li key={s.id} className="flex items-center gap-3"><span className="font-mono text-xs text-muted-foreground">{new Date(s.at).toLocaleTimeString()}</span><span className="truncate">{s.label}</span>
-                <Button size="sm" variant="ghost" className="ml-auto h-7" onClick={() => restore(s.id)}>Restore</Button></li>
+              <li key={s.id} className="flex items-center gap-3"><span className="font-mono text-xs text-slate-500">{new Date(s.at).toLocaleTimeString()}</span><span className="truncate">{s.label}</span>
+                <Button size="sm" variant="ghost" className="ml-auto h-7 text-violet-300 hover:bg-white/10" onClick={() => restore(s.id)}>Restore</Button></li>
             ))}</ul>
           )}
         </div>
       )}
-      <div role="tablist" className="grid grid-cols-3 border-b border-border md:hidden">
+      <div role="tablist" className="grid grid-cols-3 border-b border-white/10 bg-[#10131a] md:hidden">
         {(["chat", "preview", "code"] as Tab[]).map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`py-2 text-sm capitalize ${tab === t ? "border-b-2 border-primary text-foreground" : "text-muted-foreground"}`}>{t}</button>
+          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`py-3 text-xs font-semibold capitalize transition ${tab === t ? "border-b-2 border-violet-400 text-white" : "text-slate-500"}`}>{t}</button>
         ))}
       </div>
-      <div className="grid min-h-0 flex-1 md:grid-cols-[320px_1fr_minmax(320px,32%)]">
-        <section aria-label="Conversation" className={`${panel("chat")} border-r border-border bg-white`}>
-          <div className="flex h-12 shrink-0 items-center justify-between border-b border-border/80 px-4"><div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> AI assistant</div><span className="text-[11px] text-muted-foreground">BUILD</span></div>
-          <div className="flex-1 space-y-3 overflow-auto bg-white p-3">
+      <div className="grid min-h-0 flex-1 md:grid-cols-[350px_minmax(0,1fr)] xl:grid-cols-[350px_minmax(0,1fr)_300px]">
+        <section aria-label="Conversation" className={`${panel("chat")} border-r border-white/[0.08] bg-[#10131a]`}>
+          <div className="flex h-[58px] shrink-0 items-center justify-between border-b border-white/[0.08] px-4">
+            <div><div className="flex items-center gap-2 text-[13px] font-semibold text-white"><span className="grid h-7 w-7 place-items-center rounded-lg bg-violet-500/15 text-violet-300"><Sparkles className="h-4 w-4"/></span> OpenForge AI</div><p className="ml-9 mt-[-2px] text-[10px] text-slate-500">Your product-building partner</p></div>
+            <span className="rounded-md border border-white/10 px-2 py-1 text-[9px] font-bold tracking-[.14em] text-slate-500">BUILD</span>
+          </div>
+          <div className="flex-1 space-y-4 overflow-auto bg-[#10131a] p-4">
             {aiReady === false && (
-              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-                <p className="font-medium">OpenForge AI is being connected</p>
-                <p className="mt-1 text-amber-900">You will not need to enter an API key. The shared AI engine must be activated by OpenForge first.</p>
+              <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.07] p-3 text-sm text-amber-100">
+                <p className="font-medium">AI engine unavailable</p>
+                <p className="mt-1 text-xs leading-relaxed text-amber-200/70">You will not need to enter an API key. Please try again shortly.</p>
               </div>
             )}
-            {project.messages.length === 0 && aiReady === true && <p className="text-sm text-muted-foreground">Tell me what you want to build or change. I’ll inspect the whole project, make the changes, and explain what I updated.</p>}
+            {project.messages.length === 0 && aiReady === true && <div className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-3.5"><div className="mb-2 flex items-center gap-2 text-xs font-semibold text-violet-200"><Sparkles className="h-3.5 w-3.5"/> Ready when you are</div><p className="text-xs leading-6 text-slate-400">Tell me what you want to build or change. I’ll inspect your project, plan the work and make the changes while preserving what already works.</p><div className="mt-3 flex flex-wrap gap-1.5"><span className="rounded-md bg-white/[0.05] px-2 py-1 text-[10px] text-slate-500">Improve design</span><span className="rounded-md bg-white/[0.05] px-2 py-1 text-[10px] text-slate-500">Add a page</span><span className="rounded-md bg-white/[0.05] px-2 py-1 text-[10px] text-slate-500">Fix a bug</span></div></div>}
             {project.messages.map((m) => (
-              <div key={m.id} className={m.role === "user" ? "ml-6 rounded-lg bg-secondary p-2.5 text-sm" : m.role === "system" ? "rounded-lg border border-destructive/40 bg-destructive/10 p-2.5 text-sm break-words" : "text-sm"}>
-                <p className="whitespace-pre-wrap">{m.content}</p>
+              <div key={m.id} className={m.role === "user" ? "ml-5 rounded-2xl rounded-tr-sm border border-violet-300/10 bg-violet-500/[0.12] p-3 text-[13px] text-slate-100" : m.role === "system" ? "rounded-xl border border-rose-400/20 bg-rose-400/[0.08] p-3 text-[12px] text-rose-200 break-words" : "text-[13px] text-slate-300"}>
+                {m.role === "assistant" && <div className="mb-1.5 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-violet-300"><Sparkles className="h-3 w-3"/> OpenForge</div>}
+                <p className="whitespace-pre-wrap leading-6">{m.content}</p>
                 {m.proposal && <ProposalCard proposal={m.proposal} files={project.files} onApprove={() => decide(m.id, true)} onReject={() => decide(m.id, false)} />}
               </div>
             ))}
-            {busy && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Understanding your request and building…</p>}
+            {busy && <div className="flex items-center gap-2 rounded-xl border border-violet-400/15 bg-violet-400/[0.06] p-3 text-xs text-violet-200"><Loader2 className="h-4 w-4 animate-spin"/> Thinking through your request…</div>}
             <div ref={endRef} />
           </div>
-          <form className="border-t border-border p-2" onSubmit={(e) => { e.preventDefault(); void send(input); }}>
-            <Textarea value={input} onChange={(e) => setInput(e.target.value)} disabled={aiReady !== true} aria-label="Message"
-              placeholder={aiReady === true ? "Describe what you want… (Enter to send)" : "OpenForge AI is being connected"}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(input); } }} className="min-h-20 resize-none bg-background text-sm" />
-            <div className="mt-2 flex items-center justify-between">
-              <span className="truncate text-[11px] text-muted-foreground">{aiReady === true ? "OpenForge AI" : "AI engine pending"}</span>
-              {busy ? <Button size="sm" variant="secondary" type="button" onClick={() => abortRef.current?.abort()}><Square /> Stop</Button>
-                : <Button size="sm" type="submit" disabled={aiReady !== true || !input.trim()}><Send /> Send</Button>}
+          <form className="border-t border-white/[0.08] bg-[#0d1016] p-3" onSubmit={(e) => { e.preventDefault(); void send(input); }}>
+            <div className="rounded-xl border border-white/[0.12] bg-[#151923] p-2 transition focus-within:border-violet-400/50">
+              <Textarea value={input} onChange={(e) => setInput(e.target.value)} disabled={aiReady !== true} aria-label="Message"
+                placeholder={aiReady === true ? "Ask OpenForge to make a change…" : "Connecting AI engine…"}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(input); } }} className="min-h-[82px] resize-none border-0 bg-transparent text-[13px] leading-5 text-white shadow-none placeholder:text-slate-600 focus-visible:ring-0" />
+              <div className="mt-1 flex items-center justify-between border-t border-white/[0.07] pt-2">
+                <span className="text-[10px] text-slate-600">Enter to send · Shift + Enter for new line</span>
+                {busy ? <Button size="sm" variant="secondary" type="button" onClick={() => abortRef.current?.abort()} className="h-8 border border-white/10 bg-white/[0.07] text-slate-200"><Square className="h-3.5 w-3.5"/> Stop</Button>
+                  : <Button size="sm" type="submit" disabled={aiReady !== true || !input.trim()} className="h-8 gap-1.5 rounded-lg bg-violet-500 px-3 text-white hover:bg-violet-400"><Send className="h-3.5 w-3.5"/> Send</Button>}
+              </div>
             </div>
+            <p className="mt-2 text-center text-[10px] text-slate-600">OpenForge can make mistakes. Review changes before applying.</p>
           </form>
         </section>
-        <section aria-label="Live preview" className={`${panel("preview")} bg-background`}>
-          <div className="flex h-12 shrink-0 items-center justify-between border-b border-border/80 bg-white px-4"><div className="flex items-center gap-2 text-sm font-semibold"><MonitorPlay className="h-4 w-4 text-primary" /> Preview</div><span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700"><CircleDot className="h-3 w-3" /> LIVE</span></div>
-          <ClientOnly fallback={<div className="flex flex-1 items-center justify-center text-muted-foreground">Loading preview…</div>}>
-            <Suspense fallback={<div className="flex flex-1 items-center justify-center text-muted-foreground">Loading preview…</div>}>
-              <div className="min-h-[60vh] flex-1 md:min-h-0"><Preview files={project.files} /></div>
-            </Suspense>
-          </ClientOnly>
+        <section aria-label="Live preview" className={`${panel("preview")} min-w-0 bg-[#0b0d12]`}>
+          <div className="flex h-[58px] shrink-0 items-center justify-between border-b border-white/[0.08] bg-[#10131a] px-4">
+            <div className="flex items-center gap-2 text-[13px] font-semibold text-white"><MonitorPlay className="h-4 w-4 text-violet-300"/> Preview <span className="ml-1 rounded-md bg-white/[0.06] px-2 py-1 text-[9px] font-medium text-slate-500">LIVE</span></div>
+            <div className="flex items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.035] p-1"><span className="rounded-md bg-white/[0.1] px-2 py-1 text-[10px] text-slate-200">Desktop</span><span className="px-2 py-1 text-[10px] text-slate-600">Mobile</span></div>
+          </div>
+          <div className="min-h-0 flex-1 p-3 sm:p-4">
+            <div className="flex h-full min-h-[60vh] flex-col overflow-hidden rounded-xl border border-white/[0.12] bg-white shadow-[0_20px_70px_-35px_rgba(0,0,0,.8)] md:min-h-0">
+              <div className="flex h-9 shrink-0 items-center gap-2 border-b border-slate-200 bg-slate-50 px-3"><div className="flex gap-1"><i className="h-2 w-2 rounded-full bg-rose-400"/><i className="h-2 w-2 rounded-full bg-amber-300"/><i className="h-2 w-2 rounded-full bg-emerald-400"/></div><div className="mx-auto flex h-5 w-[55%] items-center justify-center rounded-md border border-slate-200 bg-white text-[9px] text-slate-400">preview.openforge.app</div></div>
+              <ClientOnly fallback={<div className="flex flex-1 items-center justify-center text-sm text-slate-400">Loading preview…</div>}>
+                <Suspense fallback={<div className="flex flex-1 items-center justify-center text-sm text-slate-400">Loading preview…</div>}>
+                  <div className="min-h-0 flex-1"><Preview files={project.files} /></div>
+                </Suspense>
+              </ClientOnly>
+            </div>
+          </div>
         </section>
-        <section aria-label="Code" className={`${panel("code")} border-l border-border bg-white`}>
-          <div className="flex h-12 shrink-0 items-center justify-between border-b border-border/80 bg-white px-4"><div className="flex items-center gap-2 text-sm font-semibold"><Code2 className="h-4 w-4 text-primary" /> Code</div><span className="text-[11px] text-muted-foreground">{Object.keys(project.files).length} files</span></div>
-          <FileExplorer files={project.files} onSave={saveFile} onDelete={deleteFile} />
+        <section aria-label="Code" className={`${panel("code")} border-l border-white/[0.08] bg-[#10131a] max-xl:hidden`}>
+          <div className="flex h-[58px] shrink-0 items-center justify-between border-b border-white/[0.08] px-4"><div className="flex items-center gap-2 text-[13px] font-semibold text-white"><Code2 className="h-4 w-4 text-violet-300"/> Files</div><span className="rounded-md bg-white/[0.05] px-2 py-1 text-[10px] text-slate-500">{Object.keys(project.files).length} files</span></div>
+          <div className="min-h-0 flex-1 overflow-auto"><FileExplorer files={project.files} onSave={saveFile} onDelete={deleteFile} /></div>
+          <div className="border-t border-white/[0.07] px-4 py-3 text-[10px] text-slate-600">Your source code · Editable</div>
         </section>
       </div>
     </div>
