@@ -6,7 +6,7 @@ import { AppHeader, CostNotice } from "@/components/forge/AppHeader";
 import { deleteProject, loadProjects, uid, upsertProject, type Project } from "@/lib/forge/storage";
 import { starterFiles } from "@/lib/forge/template";
 import { getAiStatus } from "@/lib/forge/ai";
-import { ArrowUp, Clock3, Code2, FolderOpen, Globe2, Layers3, Sparkles, Trash2, X, HardDrive, WandSparkles, Plus, Search, ChevronRight, Monitor, Zap } from "lucide-react";
+import { ArrowUp, Clock3, Code2, FolderOpen, Globe2, Layers3, Sparkles, Trash2, X, HardDrive, WandSparkles, Plus, Search, ChevronRight, Monitor, Zap, Rocket, Settings2, LayoutDashboard, PanelLeft, CircleHelp } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
@@ -51,7 +51,19 @@ function Dashboard() {
   return (
     <div className="min-h-screen bg-[#0b0d12] text-slate-100">
       <AppHeader />
-      <main className="mx-auto max-w-[1320px] px-4 pb-20 pt-9 sm:px-7 lg:px-10">
+      <aside className="fixed bottom-0 left-0 top-[68px] z-30 hidden w-[224px] flex-col border-r border-white/[0.07] bg-[#0e1118] px-4 py-6 xl:flex">
+        <div className="px-3 pb-3 text-[10px] font-bold uppercase tracking-[.2em] text-slate-600">Workspace</div>
+        <Link to="/" activeOptions={{ exact: true }} className="mb-1 flex items-center gap-3 rounded-xl bg-violet-500/[0.12] px-3 py-3 text-sm font-semibold text-violet-200"><LayoutDashboard className="h-4 w-4"/> Overview</Link>
+        <Link to="/deploy" className="mb-1 flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-400 transition hover:bg-white/[0.05] hover:text-white"><Rocket className="h-4 w-4"/> Publish</Link>
+        <Link to="/settings" className="mb-1 flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-400 transition hover:bg-white/[0.05] hover:text-white"><Settings2 className="h-4 w-4"/> AI engine</Link>
+        <div className="mt-8 px-3 pb-3 text-[10px] font-bold uppercase tracking-[.2em] text-slate-600">Your workspace</div>
+        <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-200"><span className="h-2 w-2 rounded-full bg-emerald-400"/> OpenForge ready</div>
+          <p className="mt-2 text-[11px] leading-5 text-slate-500">Create, refine and export your projects from one place.</p>
+        </div>
+        <div className="mt-auto flex items-center gap-2 px-3 text-[11px] text-slate-600"><CircleHelp className="h-3.5 w-3.5"/> Built for ideas that ship</div>
+      </aside>
+      <main className="mx-auto max-w-[1320px] px-4 pb-20 pt-7 sm:px-7 lg:px-10 xl:ml-[224px]">
         {onboard && <section aria-label="Getting started" className="relative mx-auto mb-7 max-w-4xl rounded-2xl border border-violet-400/20 bg-violet-500/[0.08] p-5">
           <button aria-label="Dismiss" className="absolute right-4 top-4 rounded-md p-1 text-slate-400 hover:bg-white/10" onClick={() => { localStorage.setItem("openforge.onboarded", "1"); setOnboard(false); }}><X className="h-4 w-4" /></button>
           <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-violet-300" /> Welcome to your OpenForge workspace</div>
@@ -59,7 +71,7 @@ function Dashboard() {
             <li>Describe your idea and OpenForge will create a React project.</li><li>The shared AI engine is already handled — no personal API key is required.</li><li>Review changes, preview your work and export your project.</li><li>Projects are currently saved in this browser only.</li>
           </ol>
         </section>}
-        <section className="relative overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#11141d] px-5 py-10 shadow-[0_30px_100px_-55px_rgba(124,58,237,.5)] sm:px-10 sm:py-14">
+        <section className="relative overflow-hidden rounded-[28px] border border-white/[0.09] bg-[linear-gradient(135deg,#171827_0%,#11141d_52%,#111a28_100%)] px-5 py-10 shadow-[0_30px_100px_-55px_rgba(124,58,237,.5)] sm:px-10 sm:py-14">
           <div className="pointer-events-none absolute -right-24 -top-36 h-[430px] w-[430px] rounded-full bg-violet-600/15 blur-[110px]" />
           <div className="pointer-events-none absolute -bottom-52 left-1/3 h-[350px] w-[500px] rounded-full bg-blue-600/10 blur-[100px]" />
           <div className="relative mx-auto max-w-[850px] text-center">
@@ -84,7 +96,7 @@ function Dashboard() {
           </div>
         </section>
         <section className="mt-12" aria-labelledby="recent">
-          <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.07] pb-5">
             <div><div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-violet-300"><Clock3 className="h-3.5 w-3.5" /> Workspace</div><h2 id="recent" className="mt-2 text-2xl font-semibold tracking-[-.035em] text-white">Your projects <span className="ml-1 text-base font-normal text-slate-600">{projects.length}</span></h2><p className="mt-1 text-sm text-slate-500">Pick up where you left off.</p></div>
             <div className="flex w-full items-center gap-2 sm:w-auto">
               {projects.length > 0 && <div className="relative flex-1 sm:w-64"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search projects..." className="h-10 w-full rounded-xl border border-white/10 bg-white/[0.04] pl-9 pr-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-violet-400/50" /></div>}
