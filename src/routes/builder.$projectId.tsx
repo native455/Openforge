@@ -9,8 +9,7 @@ import { FileExplorer } from "@/components/forge/FileExplorer";
 import { getProject, uid, upsertProject, withSnapshot, type ChatMessage, type Project } from "@/lib/forge/storage";
 import { applyProposal, type Proposal } from "@/lib/forge/changes";
 import { parseAiResponse } from "@/lib/forge/schema";
-import { requestChanges } from "@/lib/forge/ai";
-import { isConfigured, loadSettings, type ProviderSettings } from "@/lib/forge/settings";
+import { getAiStatus, requestChanges } from "@/lib/forge/ai";
 import { buildZip } from "@/lib/forge/zip";
 import { Download, History, Loader2, Send, Undo2, Square, Sparkles, MonitorPlay, Code2, CircleDot } from "lucide-react";
 
@@ -36,7 +35,7 @@ function Builder() {
   const { projectId } = Route.useParams();
   const { q } = Route.useSearch();
   const [project, setProject] = useState<Project | null | undefined>(undefined);
-  const [settings, setSettings] = useState<ProviderSettings | null>(null);
+  const [aiReady, setAiReady] = useState<boolean | null>(null);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("chat");
@@ -45,15 +44,14 @@ function Builder() {
   const autoSent = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setProject(getProject(projectId)); setSettings(loadSettings()); }, [projectId]);
+  useEffect(() => { setProject(getProject(projectId)); getAiStatus().then((s) => setAiReady(s.configured)).catch(() => setAiReady(false)); }, [projectId]);
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [project?.messages.length, busy]);
 
-  const configured = settings ? isConfigured(settings) : false;
 
   function commit(p: Project) { setProject(p); upsertProject(p); }
 
   async function send(text: string) {
-    if (!project || !settings || !text.trim() || busy) return;
+    if (!project || aiReady !== true || !text.trim() || busy) return;
     const userMsg: ChatMessage = { id: uid(), role: "user", content: text, at: Date.now() };
     let p: Project = { ...project, messages: [...project.messages, userMsg] };
     commit(p); setInput(""); setBusy(true);
@@ -63,7 +61,7 @@ function Builder() {
         role: m.role,
         content: m.proposal ? `[Proposal ${m.proposal.status}] ${m.proposal.summary}` : m.content,
       }));
-      const raw = await requestChanges(settings, project.files, history, text, ctrl.signal);
+      const raw = await requestChanges({ projectName: project.name, originalBrief: project.prompt, files: project.files, history, prompt: text }, ctrl.signal);
       const parsed = parseAiResponse(raw);
       let msg: ChatMessage;
       if (!parsed.ok) {
@@ -87,8 +85,8 @@ function Builder() {
   }
 
   useEffect(() => {
-    if (q && project && configured && !autoSent.current && project.messages.length === 0) { autoSent.current = true; void send(q); }
-  }, [q, project, configured]); // eslint-disable-line
+    if (q && project && aiReady === true && !autoSent.current && project.messages.length === 0) { autoSent.current = true; void send(q); }
+  }, [q, project, aiReady]); // eslint-disable-line
 
   function decide(msgId: string, approve: boolean) {
     if (!project) return;
@@ -169,30 +167,29 @@ function Builder() {
           <div className="flex h-12 shrink-0 items-center justify-between border-b border-border/80 px-4"><div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> AI assistant</div><span className="text-[11px] text-muted-foreground">BUILD</span></div>
           <div className="flex-1 space-y-3 overflow-auto bg-white p-3">
             {!configured && (
-              <div className="rounded-lg border border-primary/40 bg-card p-3 text-sm">
-                <p className="font-medium">Demo mode</p>
-                <p className="mt-1 text-muted-foreground">AI generation needs your own provider key. You can still edit code and use the live preview.</p>
-                <Link to="/settings" className="mt-2 inline-block text-primary underline">Configure a provider</Link>
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                <p className="font-medium">OpenForge AI is being connected</p>
+                <p className="mt-1 text-amber-900">You will not need to enter an API key. The shared AI engine must be activated by OpenForge first.</p>
               </div>
             )}
-            {project.messages.length === 0 && configured && <p className="text-sm text-muted-foreground">Describe a change, e.g. "Add a pricing section with three cards". You'll review every change before it's applied.</p>}
+            {project.messages.length === 0 && aiReady === true && <p className="text-sm text-muted-foreground">Tell me what you want to build or change. I’ll inspect the whole project, make the changes, and explain what I updated.</p>}
             {project.messages.map((m) => (
               <div key={m.id} className={m.role === "user" ? "ml-6 rounded-lg bg-secondary p-2.5 text-sm" : m.role === "system" ? "rounded-lg border border-destructive/40 bg-destructive/10 p-2.5 text-sm break-words" : "text-sm"}>
                 <p className="whitespace-pre-wrap">{m.content}</p>
                 {m.proposal && <ProposalCard proposal={m.proposal} files={project.files} onApprove={() => decide(m.id, true)} onReject={() => decide(m.id, false)} />}
               </div>
             ))}
-            {busy && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Waiting for {settings?.model}…</p>}
+            {busy && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Understanding your request and building…</p>}
             <div ref={endRef} />
           </div>
           <form className="border-t border-border p-2" onSubmit={(e) => { e.preventDefault(); void send(input); }}>
-            <Textarea value={input} onChange={(e) => setInput(e.target.value)} disabled={!configured} aria-label="Message"
-              placeholder={configured ? "Ask for a change… (Enter to send, Shift+Enter for newline)" : "Set up an AI provider to chat"}
+            <Textarea value={input} onChange={(e) => setInput(e.target.value)} disabled={aiReady !== true} aria-label="Message"
+              placeholder={aiReady === true ? "Describe what you want… (Enter to send)" : "OpenForge AI is being connected"}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(input); } }} className="min-h-20 resize-none bg-background text-sm" />
             <div className="mt-2 flex items-center justify-between">
-              <span className="truncate font-mono text-[11px] text-muted-foreground">{configured ? settings?.model : "no provider"}</span>
+              <span className="truncate text-[11px] text-muted-foreground">{aiReady === true ? "OpenForge AI" : "AI engine pending"}</span>
               {busy ? <Button size="sm" variant="secondary" type="button" onClick={() => abortRef.current?.abort()}><Square /> Stop</Button>
-                : <Button size="sm" type="submit" disabled={!configured || !input.trim()}><Send /> Send</Button>}
+                : <Button size="sm" type="submit" disabled={aiReady !== true || !input.trim()}><Send /> Send</Button>}
             </div>
           </form>
         </section>
