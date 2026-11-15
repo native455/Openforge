@@ -3,12 +3,12 @@ import { Sparkles, FolderKanban, Settings2, Rocket, ChevronDown, Command } from 
 
 export function AppHeader({ children }: { children?: React.ReactNode }) {
   return (
-    <header className="sticky top-0 z-40 flex h-[68px] shrink-0 items-center gap-4 border-b border-white/[0.08] bg-[#0b0d12]/95 px-4 text-white backdrop-blur-xl sm:px-6">
-      <Link to="/" className="flex shrink-0 items-center gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-ring">
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-[0_6px_24px_-8px_rgba(139,92,246,.8)]">
+    <header className="sticky top-0 z-40 flex h-[68px] shrink-0 items-center gap-4 border-b border-white/[0.08] bg-[#0b0d12]/90 px-4 text-white shadow-[0_8px_30px_-22px_rgba(0,0,0,.9)] backdrop-blur-2xl sm:px-6">
+      <Link to="/" className="group flex shrink-0 items-center gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-ring">
+        <span className="relative grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-400 via-violet-600 to-indigo-700 text-white shadow-[0_6px_24px_-8px_rgba(139,92,246,.8)] transition duration-300 group-hover:rotate-[-6deg] group-hover:scale-105">
           <Sparkles className="h-[18px] w-[18px]" aria-hidden />
         </span>
-        <span className="text-[16px] font-semibold tracking-[-0.04em]">OpenForge<span className="ml-1 text-violet-400">.</span></span>
+        <span className="text-[16px] font-semibold tracking-[-0.045em]">OpenForge<span className="ml-1 text-violet-400">.</span></span>
       </Link>
       {children && <div className="flex min-w-0 flex-1 items-center gap-2 border-l border-white/10 pl-4 text-sm text-slate-400">{children}</div>}
       <nav className="ml-auto flex items-center gap-1 text-[13px]">
