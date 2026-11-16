@@ -17,7 +17,7 @@ function allowed(ip: string) {
 }
 
 async function streamModel(apiKey: string, model: string, messages: { role: string; content: string }[], signal?: AbortSignal) {
-  const candidates = [...new Set([model, "cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "nvidia/nemotron-3.5-lightning:free"])];
+  const candidates = [...new Set([model, "nvidia/nemotron-3.5-super-vl:free", "cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "nvidia/nemotron-3.5-lightning:free"])];
   let selected: { reader: ReadableStreamDefaultReader<Uint8Array>; first: Uint8Array; abort: AbortController } | null = null;
   let lastError = "No available model endpoint accepted the request.";
 
@@ -27,7 +27,8 @@ async function streamModel(apiKey: string, model: string, messages: { role: stri
     const upstreamAbort = new AbortController();
     const abortFromClient = () => upstreamAbort.abort();
     signal?.addEventListener("abort", abortFromClient, { once: true });
-    const timeout = setTimeout(() => upstreamAbort.abort(), 10_000);
+    const startedAt = Date.now();
+    const timeout = setTimeout(() => upstreamAbort.abort(), 12_000);
     let response: Response | null = null;
     try {
       response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -36,7 +37,9 @@ async function streamModel(apiKey: string, model: string, messages: { role: stri
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}`, "HTTP-Referer": "https://openforge-dh0r.onrender.com", "X-Title": "OpenForge" },
         body: JSON.stringify({
           model: candidate, messages, temperature: 0.2, max_tokens: 16000, stream: true,
-          ...(candidate.startsWith("nvidia/nemotron-3.5-lightning") ? { chat_template_kwargs: { enable_thinking: false } } : {}),
+          ...(["nvidia/nemotron-3.5-super-vl", "nvidia/nemotron-3.5-lightning"].some((prefix) => candidate.startsWith(prefix))
+            ? { chat_template_kwargs: { enable_thinking: false } }
+            : {}),
         }),
       });
       if (!response.ok || !response.body) {
@@ -52,19 +55,52 @@ async function streamModel(apiKey: string, model: string, messages: { role: stri
         continue;
       }
       const reader = response.body.getReader();
-      // Wait for actual bytes, not just HTTP headers, before choosing this model.
-      const firstRead = await reader.read();
-      if (firstRead.done || !firstRead.value?.length) {
+      // Wait for the first usable assistant content token, not comments, headers, or hidden reasoning.
+      const initialChunks: Uint8Array[] = [];
+      const initialDecoder = new TextDecoder();
+      let initialText = "";
+      let gotContent = false;
+      while (!gotContent) {
+        const part = await reader.read();
+        if (part.done || !part.value?.length) break;
+        initialChunks.push(part.value);
+        initialText += initialDecoder.decode(part.value, { stream: true });
+        for (const line of initialText.split("\\n")) {
+          if (!line.startsWith("data:")) continue;
+          const data = line.slice(5).trim();
+          if (!data || data === "[DONE]") continue;
+          try {
+            const event = JSON.parse(data);
+            if (event?.error) throw new Error(event.error.message || "AI provider stream failed.");
+            const content = event?.choices?.[0]?.delta?.content;
+            if ((typeof content === "string" && content.length > 0) ||
+                (Array.isArray(content) && content.some((part: any) => typeof part?.text === "string" && part.text.length > 0))) {
+              gotContent = true;
+              break;
+            }
+          } catch (error) {
+            if (error instanceof SyntaxError) continue;
+            throw error;
+          }
+        }
+      }
+      if (!gotContent) {
         await reader.cancel().catch(() => {});
-        lastError = `AI model ${candidate} opened an empty stream.`;
+        lastError = `AI model ${candidate} did not produce a usable text token within 12 seconds.`;
+        console.error("[OpenForge AI] model attempt failed", { model: candidate, elapsedMs: Date.now() - startedAt, reason: lastError });
         clearTimeout(timeout);
         signal?.removeEventListener("abort", abortFromClient);
         continue;
       }
+      const totalLength = initialChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const first = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of initialChunks) { first.set(chunk, offset); offset += chunk.length; }
       clearTimeout(timeout);
-      selected = { reader, first: firstRead.value, abort: upstreamAbort };
+      selected = { reader, first, abort: upstreamAbort };
       // Keep the client-abort listener attached for the lifetime of the stream.
       (selected as any).cleanup = () => signal?.removeEventListener("abort", abortFromClient);
+      console.info("[OpenForge AI] model selected", { model: candidate, firstTokenMs: Date.now() - startedAt });
       break;
     } catch (error) {
       clearTimeout(timeout);
@@ -73,7 +109,8 @@ async function streamModel(apiKey: string, model: string, messages: { role: stri
       if (response?.status === 401 || response?.status === 402) throw error;
       lastError = error instanceof Error && error.name !== "AbortError"
         ? error.message
-        : `AI model ${candidate} did not respond within 10 seconds. Trying another model.`;
+        : `AI model ${candidate} did not produce a usable text token within 12 seconds. Trying another model.`;
+      console.error("[OpenForge AI] model attempt failed", { model: candidate, elapsedMs: Date.now() - startedAt, reason: lastError });
       if (response?.body) await response.body.cancel().catch(() => {});
     }
   }
@@ -148,7 +185,11 @@ export const Route = createFileRoute("/api/ai")({
     handlers: {
       GET: async () => {
         const configured = Boolean(process.env.OPENROUTER_API_KEY);
-        return Response.json({ configured, model: process.env.OPENROUTER_MODEL || "openrouter/free" });
+        const configuredModel = process.env.OPENROUTER_MODEL?.trim();
+        const model = configuredModel && configuredModel !== "openrouter/free"
+          ? configuredModel
+          : "nvidia/nemotron-3.5-super-vl:free";
+        return Response.json({ configured, model, fallbackModels: ["cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "nvidia/nemotron-3.5-lightning:free"] });
       },
       POST: async ({ request }) => {
         const apiKey = process.env.OPENROUTER_API_KEY;
@@ -171,7 +212,11 @@ export const Route = createFileRoute("/api/ai")({
         const totalBytes = entries.reduce((n, [path, content]) => n + path.length + content.length, 0);
         if (entries.length > 40 || totalBytes > 180_000) return Response.json({ error: "This project is too large for one AI edit. Try a smaller change." }, { status: 413 });
 
-        const model = process.env.OPENROUTER_MODEL || "openrouter/free";
+        const configuredModel = process.env.OPENROUTER_MODEL?.trim();
+        // Avoid openrouter/free's random routing; use a tested, fast coding-capable default.
+        const model = configuredModel && configuredModel !== "openrouter/free"
+          ? configuredModel
+          : "nvidia/nemotron-3.5-super-vl:free";
         const fileContext = entries.map(([path, content]) => `--- ${path}\n${content}`).join("\n\n");
         const history = Array.isArray(body.history) ? body.history.slice(-8).filter((m: any) => m && ["user", "assistant"].includes(m.role) && typeof m.content === "string").map((m: any) => ({ role: m.role, content: m.content.slice(0, 3000) })) : [];
         const context = [
