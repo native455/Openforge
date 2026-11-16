@@ -18,61 +18,126 @@ function allowed(ip: string) {
 
 async function streamModel(apiKey: string, model: string, messages: { role: string; content: string }[], signal?: AbortSignal) {
   const candidates = [...new Set([model, "cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "nvidia/nemotron-3.5-lightning:free"])];
-  let response: Response | null = null;
+  let selected: { reader: ReadableStreamDefaultReader<Uint8Array>; first: Uint8Array; abort: AbortController } | null = null;
   let lastError = "No available model endpoint accepted the request.";
+
+  // Do not let one unresponsive free endpoint hold the builder on its connecting state.
   for (const candidate of candidates) {
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      signal,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}`, "HTTP-Referer": "https://openforge-dh0r.onrender.com", "X-Title": "OpenForge" },
-      body: JSON.stringify({
-        model: candidate, messages, temperature: 0.2, max_tokens: 16000, stream: true,
-        ...(candidate.startsWith("nvidia/nemotron-3.5-lightning") ? { chat_template_kwargs: { enable_thinking: false } } : {}),
-      }),
-    });
-    if (res.ok && res.body) { response = res; break; }
-    const detail = (await res.text()).slice(0, 300);
-    lastError = `AI provider returned ${res.status}: ${detail}`;
-    if (res.status === 401 || res.status === 402) throw new Error(lastError);
+    if (signal?.aborted) throw new DOMException("The request was cancelled.", "AbortError");
+    const upstreamAbort = new AbortController();
+    const abortFromClient = () => upstreamAbort.abort();
+    signal?.addEventListener("abort", abortFromClient, { once: true });
+    const timeout = setTimeout(() => upstreamAbort.abort(), 10_000);
+    let response: Response | null = null;
+    try {
+      response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        signal: upstreamAbort.signal,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}`, "HTTP-Referer": "https://openforge-dh0r.onrender.com", "X-Title": "OpenForge" },
+        body: JSON.stringify({
+          model: candidate, messages, temperature: 0.2, max_tokens: 16000, stream: true,
+          ...(candidate.startsWith("nvidia/nemotron-3.5-lightning") ? { chat_template_kwargs: { enable_thinking: false } } : {}),
+        }),
+      });
+      if (!response.ok || !response.body) {
+        const detail = (await response.text()).slice(0, 240);
+        lastError = `AI provider returned ${response.status}: ${detail || response.statusText}`;
+        if (response.status === 401 || response.status === 402) {
+          clearTimeout(timeout);
+          signal?.removeEventListener("abort", abortFromClient);
+          throw new Error(lastError);
+        }
+        clearTimeout(timeout);
+        signal?.removeEventListener("abort", abortFromClient);
+        continue;
+      }
+      const reader = response.body.getReader();
+      // Wait for actual bytes, not just HTTP headers, before choosing this model.
+      const firstRead = await reader.read();
+      if (firstRead.done || !firstRead.value?.length) {
+        await reader.cancel().catch(() => {});
+        lastError = `AI model ${candidate} opened an empty stream.`;
+        clearTimeout(timeout);
+        signal?.removeEventListener("abort", abortFromClient);
+        continue;
+      }
+      clearTimeout(timeout);
+      selected = { reader, first: firstRead.value, abort: upstreamAbort };
+      // Keep the client-abort listener attached for the lifetime of the stream.
+      (selected as any).cleanup = () => signal?.removeEventListener("abort", abortFromClient);
+      break;
+    } catch (error) {
+      clearTimeout(timeout);
+      signal?.removeEventListener("abort", abortFromClient);
+      if (signal?.aborted) throw new DOMException("The request was cancelled.", "AbortError");
+      lastError = error instanceof Error && error.name !== "AbortError"
+        ? error.message
+        : `AI model ${candidate} did not respond within 10 seconds. Trying another model.`;
+      if (response?.body) await response.body.cancel().catch(() => {});
+    }
   }
-  if (!response?.body) throw new Error(lastError);
-  const reader = response.body.getReader();
+
+  if (!selected) throw new Error(`OpenForge could not connect to an AI model. ${lastError} Please try again in a moment.`);
+
+  const { reader, first, abort } = selected;
+  const cleanup = (selected as any).cleanup as (() => void) | undefined;
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   let buffer = "";
   const output = new ReadableStream<Uint8Array>({
     async start(controller) {
+      const consumeLine = (line: string) => {
+        if (!line.startsWith("data:")) return;
+        const payloadText = line.slice(5).trim();
+        if (!payloadText || payloadText === "[DONE]") return;
+        try {
+          const payload = JSON.parse(payloadText);
+          const delta = payload?.choices?.[0]?.delta?.content;
+          const text = typeof delta === "string" ? delta : Array.isArray(delta) ? delta.map((p: any) => p?.text || "").join("") : "";
+          if (text) controller.enqueue(encoder.encode(text));
+          if (payload?.error) throw new Error(payload.error.message || "AI provider stream failed.");
+        } catch (err) {
+          if (err instanceof SyntaxError) return;
+          throw err;
+        }
+      };
+      const consumeChunk = (chunk: Uint8Array, final = false) => {
+        buffer += decoder.decode(chunk, { stream: !final });
+        const lines = buffer.split("\n");
+        buffer = final ? "" : (lines.pop() || "");
+        for (const line of lines) consumeLine(line.trimEnd());
+        if (final && buffer.trim()) consumeLine(buffer.trimEnd());
+      };
       try {
+        consumeChunk(first);
         while (true) {
           const { value, done } = await reader.read();
           if (done) break;
-          buffer += decoder.decode(value, { stream: true });
+          consumeChunk(value);
+        }
+        const tail = decoder.decode();
+        if (tail) {
+          buffer += tail;
           const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-          for (const line of lines) {
-            if (!line.startsWith("data:")) continue;
-            const payloadText = line.slice(5).trim();
-            if (!payloadText || payloadText === "[DONE]") continue;
-            try {
-              const payload = JSON.parse(payloadText);
-              const delta = payload?.choices?.[0]?.delta?.content;
-              const text = typeof delta === "string" ? delta : Array.isArray(delta) ? delta.map((p: any) => p?.text || "").join("") : "";
-              if (text) controller.enqueue(encoder.encode(text));
-              if (payload?.error) throw new Error(payload.error.message || "AI provider stream failed.");
-            } catch (err) {
-              if (err instanceof SyntaxError) continue;
-              throw err;
-            }
-          }
+          for (const line of lines) consumeLine(line.trimEnd());
+          buffer = "";
+        } else if (buffer.trim()) {
+          consumeLine(buffer.trimEnd());
+          buffer = "";
         }
         controller.close();
       } catch (err) {
         controller.error(err);
       } finally {
+        cleanup?.();
         reader.releaseLock();
       }
     },
-    cancel() { reader.cancel(); },
+    async cancel(reason) {
+      abort.abort();
+      cleanup?.();
+      await reader.cancel(reason).catch(() => {});
+    },
   });
   return output;
 }
