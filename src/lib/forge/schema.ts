@@ -17,23 +17,100 @@ export type ParseResult =
   | { ok: false; error: string };
 
 function extractJson(text: string): string {
-  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fence?.[1]) return fence[1].trim();
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  return start >= 0 && end > start ? text.slice(start, end + 1) : text.trim();
+  const trimmed = text.replace(/^\uFEFF/, "").trim();
+  // Prefer a JSON-labelled fence, but don't mistake code fences inside a response for the outer payload.
+  const fenced = trimmed.match(/^\`\`\`(?:json)?\s*([\s\S]*?)\s*\`\`\`$/i);
+  if (fenced?.[1]) return fenced[1].trim();
+
+  const start = trimmed.indexOf("{");
+  if (start < 0) return trimmed;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < trimmed.length; i++) {
+    const ch = trimmed[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}" && --depth === 0) return trimmed.slice(start, i + 1);
+  }
+  // Keep the incomplete object so the caller can report a parse failure cleanly.
+  return trimmed.slice(start);
+}
+
+/**
+ * Models sometimes emit literal line breaks or tabs inside JSON string values
+ * (especially when serialising source code). Escape those control characters
+ * without changing valid JSON or characters outside strings.
+ */
+function repairJsonStrings(source: string): string {
+  let output = "";
+  let inString = false;
+  let escaped = false;
+  for (const ch of source) {
+    if (inString) {
+      if (escaped) {
+        output += ch;
+        escaped = false;
+      } else if (ch === "\\\\") {
+        output += ch;
+        escaped = true;
+      } else if (ch === '"') {
+        output += ch;
+        inString = false;
+      } else if (ch === "\n") output += "\\\\n";
+      else if (ch === "\r") output += "\\\\r";
+      else if (ch === "\t") output += "\\\\t";
+      else output += ch;
+    } else {
+      output += ch;
+      if (ch === '"') inString = true;
+    }
+  }
+  // Remove trailing commas before a closing object or array, but only outside strings.
+  let cleaned = "";
+  inString = false;
+  escaped = false;
+  for (let i = 0; i < output.length; i++) {
+    const ch = output[i];
+    if (inString) {
+      cleaned += ch;
+      if (escaped) escaped = false;
+      else if (ch === "\\\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') { inString = true; cleaned += ch; continue; }
+    if (ch === ",") {
+      let next = i + 1;
+      while (next < output.length && /\s/.test(output[next])) next++;
+      if (output[next] === "}" || output[next] === "]") continue;
+    }
+    cleaned += ch;
+  }
+  return cleaned;
 }
 
 /** Parse and validate a raw model reply into safe file changes. */
 export function parseAiResponse(text: string): ParseResult {
   let data: unknown;
+  const candidate = extractJson(text);
   try {
-    data = JSON.parse(extractJson(text));
+    data = JSON.parse(candidate);
   } catch {
-    return { ok: false, error: "The model did not return valid JSON." };
+    try {
+      data = JSON.parse(repairJsonStrings(candidate));
+    } catch {
+      return { ok: false, error: "The AI response was incomplete or malformed. Please try again; your existing project files are unchanged." };
+    }
   }
   const parsed = aiResponseSchema.safeParse(data);
-  if (!parsed.success) return { ok: false, error: "Response did not match the expected format: " + parsed.error.issues[0]?.message };
+  if (!parsed.success) return { ok: false, error: "The AI response did not match the required website-change format: " + parsed.error.issues[0]?.message };
   const changes: FileChange[] = [];
   const rejected: { path: string; reason: string }[] = [];
   const seen = new Set<string>();
