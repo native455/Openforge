@@ -70,6 +70,7 @@ async function streamModel(apiKey: string, model: string, messages: { role: stri
       clearTimeout(timeout);
       signal?.removeEventListener("abort", abortFromClient);
       if (signal?.aborted) throw new DOMException("The request was cancelled.", "AbortError");
+      if (response?.status === 401 || response?.status === 402) throw error;
       lastError = error instanceof Error && error.name !== "AbortError"
         ? error.message
         : `AI model ${candidate} did not respond within 10 seconds. Trying another model.`;
