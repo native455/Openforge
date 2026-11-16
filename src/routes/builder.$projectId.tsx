@@ -39,6 +39,8 @@ function Builder() {
   const [aiReady, setAiReady] = useState<boolean | null>(null);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [streamLength, setStreamLength] = useState(0);
+  const [workingFiles, setWorkingFiles] = useState<Record<string, string> | null>(null);
   const [tab, setTab] = useState<Tab>("chat");
   const [previewSize, setPreviewSize] = useState<PreviewSize>("desktop");
   const [previewKey, setPreviewKey] = useState(0);
@@ -58,26 +60,32 @@ function Builder() {
     if (!project || aiReady !== true || !text.trim() || busy) return;
     const userMsg: ChatMessage = { id: uid(), role: "user", content: text, at: Date.now() };
     let p: Project = { ...project, messages: [...project.messages, userMsg] };
-    commit(p); setInput(""); setBusy(true);
+    commit(p); setInput(""); setBusy(true); setStreamLength(0); setWorkingFiles(null);
     const ctrl = new AbortController(); abortRef.current = ctrl;
     try {
       const history = project.messages.filter((m) => m.role !== "system").map((m) => ({
         role: m.role,
         content: m.proposal ? `[Proposal ${m.proposal.status}] ${m.proposal.summary}` : m.content,
       }));
-      const raw = await requestChanges({ projectName: project.name, originalBrief: project.prompt, files: project.files, history, prompt: text }, ctrl.signal);
+      const raw = await requestChanges({ projectName: project.name, originalBrief: project.prompt, files: project.files, history, prompt: text }, ctrl.signal, (chunk) => setStreamLength((n) => n + chunk.length));
       const parsed = parseAiResponse(raw);
       let msg: ChatMessage;
       if (!parsed.ok) {
+        setWorkingFiles(null);
         msg = { id: uid(), role: "system", content: parsed.error + " Try rephrasing, or use a stronger model.", at: Date.now() };
       } else {
         // Ignore no-op edits so the assistant cannot ask the user to apply code that is already present.
         const effectiveChanges = parsed.changes.filter((change) =>
           change.action === "delete" ? change.path in project.files : project.files[change.path] !== change.content
         );
-        msg = effectiveChanges.length > 0
-          ? { id: uid(), role: "assistant", content: parsed.summary, at: Date.now(), proposal: { id: uid(), summary: parsed.summary, changes: effectiveChanges, rejected: parsed.rejected, status: "pending" } }
-          : { id: uid(), role: "assistant", content: parsed.summary, at: Date.now() };
+        if (effectiveChanges.length > 0) {
+          const previewProposal = { id: uid(), summary: parsed.summary, changes: effectiveChanges, rejected: parsed.rejected, status: "pending" as const };
+          setWorkingFiles(applyProposal(project.files, previewProposal));
+          msg = { id: uid(), role: "assistant", content: parsed.summary, at: Date.now(), proposal: previewProposal };
+        } else {
+          setWorkingFiles(null);
+          msg = { id: uid(), role: "assistant", content: parsed.summary, at: Date.now() };
+        }
       }
       p = { ...p, messages: [...p.messages, msg] };
     } catch (e) {
@@ -101,6 +109,7 @@ function Builder() {
       p = withSnapshot(p, "Before: " + msg.proposal.summary.slice(0, 60));
       p = { ...p, files: applyProposal(p.files, msg.proposal) };
     }
+    setWorkingFiles(null);
     const status: Proposal["status"] = approve ? "applied" : "rejected";
     commit({ ...p, messages: p.messages.map((m) => (m.id === msgId ? { ...m, proposal: { ...m.proposal!, status } } : m)) });
     if (approve) toast.success("Changes applied");
@@ -187,7 +196,7 @@ function Builder() {
                 {m.proposal && <ProposalCard proposal={m.proposal} files={project.files} onApprove={() => decide(m.id, true)} onReject={() => decide(m.id, false)} />}
               </div>
             ))}
-            {busy && <div className="flex items-center gap-2 rounded-xl border border-violet-400/15 bg-violet-400/[0.06] p-3 text-xs text-violet-200"><Loader2 className="h-4 w-4 animate-spin"/> Thinking through your request…</div>}
+            {busy && <div className="rounded-xl border border-violet-400/15 bg-violet-400/[0.06] p-3 text-xs text-violet-200"><div className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin"/>{streamLength > 0 ? "Generating website code…" : "Connecting to the AI builder…"}</div><p className="mt-1 pl-6 text-[10px] text-violet-200/60">{streamLength > 0 ? `${streamLength.toLocaleString()} characters received` : "Waiting for the first streamed tokens"}</p></div>}
             <div ref={endRef} />
           </div>
           <form className="border-t border-white/[0.08] bg-[#0d1016] p-3" onSubmit={(e) => { e.preventDefault(); void send(input); }}>
@@ -224,7 +233,7 @@ function Builder() {
               <div className="flex h-9 shrink-0 items-center gap-2 border-b border-slate-200 bg-slate-50 px-3"><div className="flex gap-1"><i className="h-2 w-2 rounded-full bg-rose-400"/><i className="h-2 w-2 rounded-full bg-amber-300"/><i className="h-2 w-2 rounded-full bg-emerald-400"/></div><div className="mx-auto flex h-5 w-[55%] items-center justify-center rounded-md border border-slate-200 bg-white text-[9px] text-slate-400">preview.openforge.app</div></div>
               <ClientOnly fallback={<div className="flex flex-1 items-center justify-center text-sm text-slate-400">Loading preview…</div>}>
                 <Suspense fallback={<div className="flex flex-1 items-center justify-center text-sm text-slate-400">Loading preview…</div>}>
-                  <div className="min-h-0 flex-1"><Preview key={`${previewKey}-${previewSize}`} files={project.files} /></div>
+                  <div className="min-h-0 flex-1"><Preview key={`${previewKey}-${previewSize}`} files={workingFiles ?? project.files} /></div>
                 </Suspense>
               </ClientOnly>
             </div>
