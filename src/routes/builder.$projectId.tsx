@@ -149,7 +149,6 @@ function Builder() {
           <span className="mr-2 hidden items-center gap-1.5 rounded-full border border-emerald-400/15 bg-emerald-400/[0.07] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-300 sm:inline-flex"><CircleDot className="h-3 w-3"/> Autosaved locally</span>
           <Button size="sm" variant="ghost" onClick={() => project.snapshots[0] && restore(project.snapshots[0].id)} disabled={!project.snapshots.length} aria-label="Undo last change" className="text-slate-400 hover:bg-white/10 hover:text-white"><Undo2 /><span className="hidden lg:inline">Undo</span></Button>
           <Button size="sm" variant="ghost" onClick={() => setShowHistory((v) => !v)} aria-expanded={showHistory} className="text-slate-400 hover:bg-white/10 hover:text-white"><History /><span className="hidden lg:inline">History</span></Button>
-          <Button size="sm" variant="secondary" onClick={exportZip} className="border border-white/10 bg-white/[0.08] text-slate-100 hover:bg-white/[0.13]"><Download /><span className="hidden lg:inline">Export</span></Button>
         </div>
       </AppHeader>
       {showHistory && (
@@ -217,18 +216,25 @@ function Builder() {
             </div>
           </div>
           <div className={`min-h-0 flex-1 p-3 sm:p-4 ${previewExpanded?"fixed inset-0 z-[70] bg-[#0b0d12]":""}`}>
-            <div className={`mx-auto flex h-full min-h-[60vh] flex-col overflow-hidden rounded-xl border border-white/[0.12] bg-white shadow-[0_20px_70px_-35px_rgba(0,0,0,.8)] transition-[width] duration-300 md:min-h-0 ${previewSize==="mobile"?"w-[390px] max-w-full":previewSize==="tablet"?"w-[820px] max-w-full":"w-full"}`}>
+            <div
+              className="mx-auto flex h-full min-h-[60vh] min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-white/[0.12] bg-white shadow-[0_20px_70px_-35px_rgba(0,0,0,.8)] transition-[width] duration-300 md:min-h-0"
+              style={{ width: previewSize === "mobile" ? "390px" : previewSize === "tablet" ? "768px" : "100%" }}
+              data-preview-device={previewSize}
+            >
               <div className="flex h-9 shrink-0 items-center gap-2 border-b border-slate-200 bg-slate-50 px-3"><div className="flex gap-1"><i className="h-2 w-2 rounded-full bg-rose-400"/><i className="h-2 w-2 rounded-full bg-amber-300"/><i className="h-2 w-2 rounded-full bg-emerald-400"/></div><div className="mx-auto flex h-5 w-[55%] items-center justify-center rounded-md border border-slate-200 bg-white text-[9px] text-slate-400">preview.openforge.app</div></div>
               <ClientOnly fallback={<div className="flex flex-1 items-center justify-center text-sm text-slate-400">Loading preview…</div>}>
                 <Suspense fallback={<div className="flex flex-1 items-center justify-center text-sm text-slate-400">Loading preview…</div>}>
-                  <div className="min-h-0 flex-1"><Preview key={previewKey} files={project.files} /></div>
+                  <div className="min-h-0 flex-1"><Preview key={`${previewKey}-${previewSize}`} files={project.files} /></div>
                 </Suspense>
               </ClientOnly>
             </div>
           </div>
         </section>
         <section aria-label="Code" className={`${tab === "code" ? "flex" : "hidden"} xl:flex min-h-0 flex-col border-l border-white/[0.08] bg-[#10131a]`}>
-          <div className="flex h-[58px] shrink-0 items-center justify-between border-b border-white/[0.08] px-4"><div className="flex items-center gap-2 text-[13px] font-semibold text-white"><Code2 className="h-4 w-4 text-violet-300"/> Files</div><span className="rounded-md bg-white/[0.05] px-2 py-1 text-[10px] text-slate-500">{Object.keys(project.files).length} files</span></div>
+                    <div className="flex h-[58px] shrink-0 items-center justify-between gap-2 border-b border-white/[0.08] px-3 sm:px-4">
+            <div className="flex items-center gap-2 text-[13px] font-semibold text-white"><Code2 className="h-4 w-4 text-violet-300"/> Files <span className="rounded-md bg-white/[0.05] px-2 py-1 text-[10px] font-normal text-slate-500">{Object.keys(project.files).length}</span></div>
+            <Button size="sm" variant="secondary" onClick={exportZip} className="h-8 border border-white/10 bg-white/[0.08] px-2.5 text-xs text-slate-100 hover:bg-white/[0.13]"><Download className="mr-1.5 h-3.5 w-3.5"/> Export ZIP</Button>
+          </div>
           <div className="min-h-0 flex-1 overflow-auto"><FileExplorer files={project.files} onSave={saveFile} onDelete={deleteFile} /></div>
           <div className="border-t border-white/[0.07] px-4 py-3 text-[10px] text-slate-600">Your source code · Editable</div>
         </section>
