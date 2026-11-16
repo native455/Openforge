@@ -65,7 +65,7 @@ async function streamModel(apiKey: string, model: string, messages: { role: stri
         if (part.done || !part.value?.length) break;
         initialChunks.push(part.value);
         initialText += initialDecoder.decode(part.value, { stream: true });
-        for (const line of initialText.split("\\n")) {
+        for (const line of initialText.split("\n")) {
           if (!line.startsWith("data:")) continue;
           const data = line.slice(5).trim();
           if (!data || data === "[DONE]") continue;
