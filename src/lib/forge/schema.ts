@@ -100,13 +100,19 @@ function repairJsonStrings(source: string): string {
 export function parseAiResponse(text: string): ParseResult {
   let data: unknown;
   const candidate = extractJson(text);
+  let initialParseError = "";
   try {
     data = JSON.parse(candidate);
-  } catch {
+  } catch (error) {
+    initialParseError = error instanceof Error ? error.message : "Invalid JSON";
     try {
       data = JSON.parse(repairJsonStrings(candidate));
-    } catch {
-      return { ok: false, error: "The AI response was incomplete or malformed. Please try again; your existing project files are unchanged." };
+    } catch (repairError) {
+      const detail = repairError instanceof Error ? repairError.message : initialParseError;
+      return {
+        ok: false,
+        error: `The AI returned invalid JSON (${detail}). It produced ${candidate.length.toLocaleString()} characters before parsing failed. Your existing project files are unchanged.`,
+      };
     }
   }
   const parsed = aiResponseSchema.safeParse(data);
