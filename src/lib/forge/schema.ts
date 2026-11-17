@@ -31,7 +31,7 @@ function extractJson(text: string): string {
     const ch = trimmed[i];
     if (inString) {
       if (escaped) escaped = false;
-      else if (ch === "\\\\") escaped = true;
+      else if (ch === "\\") escaped = true;
       else if (ch === '"') inString = false;
       continue;
     }
@@ -57,15 +57,15 @@ function repairJsonStrings(source: string): string {
       if (escaped) {
         output += ch;
         escaped = false;
-      } else if (ch === "\\\\") {
+      } else if (ch === "\\") {
         output += ch;
         escaped = true;
       } else if (ch === '"') {
         output += ch;
         inString = false;
-      } else if (ch === "\n") output += "\\\\n";
-      else if (ch === "\r") output += "\\\\r";
-      else if (ch === "\t") output += "\\\\t";
+      } else if (ch === "\n") output += "\\n";
+      else if (ch === "\r") output += "\\r";
+      else if (ch === "\t") output += "\\t";
       else output += ch;
     } else {
       output += ch;
@@ -81,7 +81,7 @@ function repairJsonStrings(source: string): string {
     if (inString) {
       cleaned += ch;
       if (escaped) escaped = false;
-      else if (ch === "\\\\") escaped = true;
+      else if (ch === "\\") escaped = true;
       else if (ch === '"') inString = false;
       continue;
     }
