@@ -17,7 +17,7 @@ function allowed(ip: string) {
 }
 
 async function streamModel(apiKey: string, model: string, messages: { role: string; content: string }[], signal?: AbortSignal) {
-  const candidates = [...new Set([model, "nvidia/nemotron-3-ultra-550b-a55b:free", "nvidia/nemotron-3.5-super-vl:free", "cohere/north-mini-code:free", "nvidia/nemotron-3.5-lightning:free"])];
+  const candidates = [...new Set([model, "baidu/ernie-5.5-flash-preview:free", "dots-studio/dots-3-note-preview:free", "recursive/flint-v1.0:free", "nvidia/nemotron-3.5-super-vl:free", "cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "nvidia/nemotron-3.5-lightning:free"])];
   let selected: { reader: ReadableStreamDefaultReader<Uint8Array>; first: Uint8Array; abort: AbortController } | null = null;
   let lastError = "No available model endpoint accepted the request.";
 
@@ -28,7 +28,7 @@ async function streamModel(apiKey: string, model: string, messages: { role: stri
     const abortFromClient = () => upstreamAbort.abort();
     signal?.addEventListener("abort", abortFromClient, { once: true });
     const startedAt = Date.now();
-    const timeout = setTimeout(() => upstreamAbort.abort(), 12_000);
+    const timeout = setTimeout(() => upstreamAbort.abort(), 20_000);
     let response: Response | null = null;
     try {
       response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -86,7 +86,7 @@ async function streamModel(apiKey: string, model: string, messages: { role: stri
       }
       if (!gotContent) {
         await reader.cancel().catch(() => {});
-        lastError = `AI model ${candidate} did not produce a usable text token within 12 seconds.`;
+        lastError = `AI model ${candidate} did not produce a usable text token within 20 seconds.`;
         console.error("[OpenForge AI] model attempt failed", { model: candidate, elapsedMs: Date.now() - startedAt, reason: lastError });
         clearTimeout(timeout);
         signal?.removeEventListener("abort", abortFromClient);
@@ -194,8 +194,8 @@ export const Route = createFileRoute("/api/ai")({
         const configuredModel = process.env.OPENROUTER_MODEL?.trim();
         const model = configuredModel && configuredModel !== "openrouter/free"
           ? configuredModel
-          : "nvidia/nemotron-3-ultra-550b-a55b:free";
-        return Response.json({ configured, model, fallbackModels: ["cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "nvidia/nemotron-3.5-lightning:free"] });
+          : "baidu/ernie-5.5-flash-preview:free";
+        return Response.json({ configured, model, fallbackModels: ["baidu/ernie-5.5-flash-preview:free", "dots-studio/dots-3-note-preview:free", "recursive/flint-v1.0:free", "nvidia/nemotron-3.5-super-vl:free", "cohere/north-mini-code:free"] });
       },
       POST: async ({ request }) => {
         const apiKey = process.env.OPENROUTER_API_KEY;
