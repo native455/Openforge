@@ -17,7 +17,7 @@ function allowed(ip: string) {
 }
 
 async function streamModel(apiKey: string, model: string, messages: { role: string; content: string }[], signal?: AbortSignal) {
-  const candidates = [...new Set([model, "nvidia/nemotron-3.5-super-vl:free", "cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "nvidia/nemotron-3.5-lightning:free"])];
+  const candidates = [...new Set([model, "nvidia/nemotron-3-ultra-550b-a55b:free", "nvidia/nemotron-3.5-super-vl:free", "cohere/north-mini-code:free", "nvidia/nemotron-3.5-lightning:free"])];
   let selected: { reader: ReadableStreamDefaultReader<Uint8Array>; first: Uint8Array; abort: AbortController } | null = null;
   let lastError = "No available model endpoint accepted the request.";
 
@@ -36,7 +36,7 @@ async function streamModel(apiKey: string, model: string, messages: { role: stri
         signal: upstreamAbort.signal,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}`, "HTTP-Referer": "https://openforge-dh0r.onrender.com", "X-Title": "OpenForge" },
         body: JSON.stringify({
-          model: candidate, messages, temperature: 0.2, max_tokens: 16000, stream: true,
+          model: candidate, messages, temperature: 0.2, max_tokens: 16000, stream: true, response_format: { type: "json_object" },
           ...(["nvidia/nemotron-3.5-super-vl", "nvidia/nemotron-3.5-lightning"].some((prefix) => candidate.startsWith(prefix))
             ? { chat_template_kwargs: { enable_thinking: false } }
             : {}),
@@ -124,15 +124,20 @@ async function streamModel(apiKey: string, model: string, messages: { role: stri
   let buffer = "";
   const output = new ReadableStream<Uint8Array>({
     async start(controller) {
+      let streamedCharacters = 0;
+      let finishReason: string | null = null;
       const consumeLine = (line: string) => {
         if (!line.startsWith("data:")) return;
         const payloadText = line.slice(5).trim();
         if (!payloadText || payloadText === "[DONE]") return;
         try {
           const payload = JSON.parse(payloadText);
-          const delta = payload?.choices?.[0]?.delta?.content;
+          const choice = payload?.choices?.[0];
+          if (typeof choice?.finish_reason === "string") finishReason = choice.finish_reason;
+          if (finishReason === "length") throw new Error("The AI model reached its output limit before finishing the website files. Your project is unchanged; try asking for the site in smaller sections.");
+          const delta = choice?.delta?.content;
           const text = typeof delta === "string" ? delta : Array.isArray(delta) ? delta.map((p: any) => p?.text || "").join("") : "";
-          if (text) controller.enqueue(encoder.encode(text));
+          if (text) { streamedCharacters += text.length; controller.enqueue(encoder.encode(text)); }
           if (payload?.error) throw new Error(payload.error.message || "AI provider stream failed.");
         } catch (err) {
           if (err instanceof SyntaxError) return;
@@ -163,6 +168,7 @@ async function streamModel(apiKey: string, model: string, messages: { role: stri
           consumeLine(buffer.trimEnd());
           buffer = "";
         }
+        console.info("[OpenForge AI] generation stream completed", { streamedCharacters, finishReason });
         controller.close();
       } catch (err) {
         controller.error(err);
@@ -188,7 +194,7 @@ export const Route = createFileRoute("/api/ai")({
         const configuredModel = process.env.OPENROUTER_MODEL?.trim();
         const model = configuredModel && configuredModel !== "openrouter/free"
           ? configuredModel
-          : "nvidia/nemotron-3.5-super-vl:free";
+          : "nvidia/nemotron-3-ultra-550b-a55b:free";
         return Response.json({ configured, model, fallbackModels: ["cohere/north-mini-code:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "nvidia/nemotron-3.5-lightning:free"] });
       },
       POST: async ({ request }) => {
@@ -216,7 +222,7 @@ export const Route = createFileRoute("/api/ai")({
         // Avoid openrouter/free's random routing; use a tested, fast coding-capable default.
         const model = configuredModel && configuredModel !== "openrouter/free"
           ? configuredModel
-          : "nvidia/nemotron-3.5-super-vl:free";
+          : "nvidia/nemotron-3-ultra-550b-a55b:free";
         const fileContext = entries.map(([path, content]) => `--- ${path}\n${content}`).join("\n\n");
         const history = Array.isArray(body.history) ? body.history.slice(-8).filter((m: any) => m && ["user", "assistant"].includes(m.role) && typeof m.content === "string").map((m: any) => ({ role: m.role, content: m.content.slice(0, 3000) })) : [];
         const context = [
